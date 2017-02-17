@@ -1,0 +1,23 @@
+{
+  "name": "scraplicita",
+  "version": "1.0.0",
+  "description": "crawler bidding",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nagahshi/ScrapLicita.git"
+  },
+  "keywords": [
+    "crawler",
+    "bidding"
+  ],
+  "author": "Willian C. Klein",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nagahshi/ScrapLicita/issues"
+  },
+  "homepage": "https://github.com/nagahshi/ScrapLicita#readme"
+}

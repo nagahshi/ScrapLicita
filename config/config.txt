@@ -1,0 +1,13 @@
+mkdir webdriverio-test && cd webdriverio-test
+
+curl -O http://selenium-release.storage.googleapis.com/3.0/selenium-server-standalone-3.0.1.jar
+
+apt-get install node
+
+apt-get install npm
+
+apt-get install xvfb-run
+
+npm install webdriverio
+
+DISPLAY=:1 xvfb-run -a java -jar selenium-server-standalone-3.0.1.jar
