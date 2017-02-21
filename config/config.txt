@@ -84,7 +84,7 @@ service selenium start
 
 netstat -tln
 
-######################### install webdriver ###################################
+######################### install webdriver ####################################
 
 mkdir webdriverio && cd webdriverio
 
@@ -95,3 +95,6 @@ apt-get install npm
 apt-get install xvfb-run
 
 npm install webdriverio
+
+######################### run manually server ##################################
+DISPLAY=:1 xvfb-run -a java -jar selenium-server-standalone-3.0.1.jar
