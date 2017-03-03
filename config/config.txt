@@ -105,3 +105,5 @@ tar -xvzf geckodriver-v0.9.0-linux64.tar.gz
 rm geckodriver-v0.9.0-linux64.tar.gz
 chmod +x geckodriver
 cp geckodriver wires
+export PATH=$PATH:/root/bin/wires
+export PATH=$PATH:/root/bin/geckodriver
