@@ -1,52 +1,86 @@
-'use strict'
+var Horseman = require("node-horseman");
+var horseman = new Horseman();
+const moment = require('moment');
+var request = require('request');
+var host = 'http://159.203.173.193/bidding';
+var links = [];
 
-let webdriverio = require('webdriverio');
-let request = require('request');
-let host = 'http://159.203.173.193/bidding';
-let options = {
-  desiredCapabilities: {
-    browserName: 'firefox'
-  }
-};
+function getLinks(){
+  return horseman.evaluate( function(){
+    var links = [];
+    $(".grid-resultado tbody tr").each(function( item ){
+      var str_dt = ''+$($(this).find('td').get(3)).text().trim().replace(/\D/g,'');
+      if(str_dt!=''){
+        str_dt = str_dt.substr(-8,4)+'-'+str_dt.substr(-10,2)+'-'+str_dt.substr(-12,2)+' '+str_dt.substr(-4,2)+':'+str_dt.substr(-2,2);
+      }else{
+        var d = new Date();
+        str_dt = d.getFullYear()+'-'+('00'+(d.getMonth()+1)).slice(-2)+'-'+('00'+(d.getDate()+1)).slice(-2)+' 00:00:00';
+      }
+      var edital = $($(this).find('td').get(0)).text().trim();
+      var bidding = {
+        state: 'sp',
+        edital_number : edital,
+        control:'ENPSP_'+edital,
+        client: $($(this).find('td').get(1)).text().trim(),
+        bid_at: str_dt,
+        object: $($(this).find('td').get(4)).text().trim(),
+        link: 'http://e-negocioscidadesp.prefeitura.sp.gov.br/'
+      };
+      links.push(bidding);
+    });
+    return links;
+  });
+}
 
-webdriverio
-.remote(options)
-.init()
-.url('http://e-negocioscidadesp.prefeitura.sp.gov.br/BuscaLicitacao.aspx')
-.pause(1000)
-.click('#ctl00_cphConteudo_frmBuscaLicitacao_ibtBuscar')
-.pause(1000)
-.getText('td').then((res)=>{
-  res = res.filter((value)=>{ return value != ''; });
-  let j = 0, reg = new RegExp('^[0-9]+$');
-  for(let i = 0;i < res.length; i++){
-    if(i != 0){
-      if(j == 5){j = 1;}else{j++;}
-      if(j == 5){
-        let str_dt = res[(i-1)].replace(/\D/g,''),bidding = new Object,day,month,year,hour;
-        day = str_dt.substr(0,2);
-        month = str_dt.substr(2,2);
-        year = str_dt.substr(4,4);
-        hour = ' '+str_dt.substr(8,2)+':'+str_dt.substr(10,2)+':00';
-        bidding.state = 'sp';
-        bidding.edital_number = res[(i-4)];
-        bidding.control = 'ENPSP_'+res[(i-4)];
-        bidding.client = res[(i-3)];
-        bidding.bid_at = year+'-'+month+'-'+day+hour;
-        bidding.object = res[i];
-        bidding.link = 'http://e-negocioscidadesp.prefeitura.sp.gov.br/';
-        request.post({
-          url: host,
-          form: bidding,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.110 Safari/537.36',
-            'Content-Type' : 'application/x-www-form-urlencoded'
-          },
-          method: 'POST'
-        },function (e, r, body) {
-          console.log(body);
+function hasNextPage(){
+  return horseman.exists("#ctl00_cphConteudo_gdvResultadoBusca_pgrGridView_btrNext_lbtText");
+}
+
+function scrape(){
+  return new Promise( function( resolve, reject ){
+    return getLinks()
+    .then(function(newLinks){
+      links = links.concat(newLinks);
+      if (links.length < 300){
+        return hasNextPage()
+        .then(function(hasNext){
+          if (hasNext){
+            return horseman
+            .click("#ctl00_cphConteudo_gdvResultadoBusca_pgrGridView_btrNext_lbtText")
+            .waitForSelector('#ctl00_cphConteudo_gdvResultadoBusca_pgrGridView_pnlResults')
+            .then( scrape );
+          }
         });
       }
-    }
+    })
+    .then( resolve );
+  });
+}
+
+horseman
+.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0')
+.open('http://e-negocioscidadesp.prefeitura.sp.gov.br/BuscaLicitacao.aspx')
+.includeJs('http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js')
+.type('input[name="ctl00$cphConteudo$frmBuscaLicitacao$txtDataPublicacaoInicio"]',moment().add(-1,'days').format('DD/MM/Y'))
+.type('input[name="ctl00$cphConteudo$frmBuscaLicitacao$txtDataPublicacaoFim"]',moment().add(-1,'days').format('DD/MM/Y'))
+.click('input[name="ctl00$cphConteudo$frmBuscaLicitacao$ibtBuscar"]')
+.waitForNextPage()
+.waitForSelector('#ctl00_cphConteudo_gdvResultadoBusca_ifbGridView_lnkNovaBusca')
+.then( scrape )
+.finally(function(){
+  for(i=0;i <= links.length;i++){
+    var bidding = links[i];
+    request.post({
+      url: host,
+      form: bidding,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.110 Safari/537.36',
+        'Content-Type' : 'application/x-www-form-urlencoded'
+      },
+      method: 'POST'
+    },function (e, r, body) {
+      console.log(body);
+    });
   }
-}).pause(1000).end();
+  horseman.close();
+});

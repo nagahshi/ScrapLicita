@@ -19,5 +19,10 @@
   "bugs": {
     "url": "https://github.com/nagahshi/ScrapLicita/issues"
   },
-  "homepage": "https://github.com/nagahshi/ScrapLicita#readme"
+  "homepage": "https://github.com/nagahshi/ScrapLicita#readme",
+  "dependencies": {
+    "moment": "^2.17.1",
+    "node-horseman": "^3.2.0",
+    "util": "^0.10.3"
+  }
 }

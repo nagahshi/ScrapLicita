@@ -1,36 +1,73 @@
-'use strict'
-
-let webdriverio = require('webdriverio');
-let request = require('request');
-let host = 'http://159.203.173.193/bidding';
+var Horseman = require("node-horseman");
+var horseman = new Horseman();
 var moment = require('moment');
-let day = moment().add(10,'days').format("D");
-let month = moment().add(10,'days').format("M");
-let year = moment().add(10,'days').format("Y");
-var page = 1;
-let options = {
-  desiredCapabilities: {
-    browserName: 'firefox'
-  }
-};
-webdriverio
-.remote(options)
-.init()
-.url('https://www.imprensaoficial.com.br/ENegocios/BuscaENegocios_14_1.aspx')
-.pause(500)
-.selectByIndex('#Status_cboAberturaSecaoInicioDia',day)
-.pause(500)
-.selectByIndex('#Status_cboAberturaSecaoInicioMes',month)
-.pause(500)
-.selectByIndex('#Status_cboAberturaSecaoFimDia',day)
-.pause(500)
-.selectByIndex('#Status_cboAberturaSecaoFimMes',month)
-.pause(500)
+var request = require('request');
+var host = 'http://159.203.173.193/bidding/url';
+var links = [];
+
+function getLinks(){
+  return horseman.evaluate( function(){
+    var links = [];
+    $("#ResultadoBusca_dtgResultadoBusca tbody a").each(function( item ){
+      var link = {
+        control : 'imprensaoficial',
+        link : 'https://www.imprensaoficial.com.br/ENegocios/'+$(this).attr("href"),
+      };
+      links.push(link);
+    });
+    return links;
+  });
+}
+
+function hasNextPage(){
+  return horseman.exists("#ResultadoBusca_PaginadorBaixo_btnProxima");
+}
+
+function scrape(){
+
+  return new Promise( function( resolve, reject ){
+    return getLinks()
+    .then(function(newLinks){
+      links = links.concat(newLinks);
+      if (links.length < 300){
+        return hasNextPage()
+        .then(function(hasNext){
+          if (hasNext){
+            return horseman
+            .click("#ResultadoBusca_PaginadorBaixo_btnProxima")
+            .waitForNextPage()
+            .waitForSelector('#filtroBuscaControle_lblDocumentosEncontrado')
+            .then( scrape );
+          }
+        });
+      }
+    })
+    .then( resolve );
+  });
+}
+
+horseman
+.userAgent('Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0')
+.open('https://www.imprensaoficial.com.br/ENegocios/BuscaENegocios_14_1.aspx')
+.select('#Status_cboAberturaSecaoInicioDia',moment().add(9,'days').format('D'))
+.select('#Status_cboAberturaSecaoInicioMes',moment().add(9,'days').format('M'))
+.select('#Status_cboAberturaSecaoFimDia',moment().add(9,'days').format('D'))
+.select('#Status_cboAberturaSecaoFimMes',moment().add(9,'days').format('M'))
 .click('#btnBuscar')
-.pause(500)
-.getText('a').then((res)=>{
-  res = res.filter((value)=>{ return value != ''; });
-  for(let i = 0;i < res.length; i++){
-    console.log(res[i]);
-  }
-}).pause(1000).end();
+.waitForNextPage()
+.waitForSelector('#filtroBuscaControle_lblDocumentosEncontrado')
+.then( scrape )
+.finally(function(){
+  request.post({
+    url: host,
+    form: {items:JSON.stringify(links)},
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.110 Safari/537.36',
+      'Content-Type' : 'application/x-www-form-urlencoded'
+    },
+    method: 'POST'
+  },function (e, r, body) {
+    console.log(body);
+  });
+  horseman.close();
+});
